@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package log.v1;
+
+service Log {
+  rpc Produce(ProduceRequest) returns (ProduceResponse) {}
+  rpc Consume(ConsumeRequest) returns (ConsumeResponse) {}
+}
+
+message ProduceRequest  {
+  RecordBatch record_batch = 1;
+}
+
+message ProduceResponse  {
+  Error error = 1;
+}
+
+message ConsumeRequest {
+  uint64 offset = 1;
+  uint64 records = 2;
+}
+
+message ConsumeResponse {
+  Error error = 1;
+  RecordBatch record_batch = 2;
+}
+
+message Error {
+  int32 code = 1;
+  string message = 2;    
+}
+  
+message RecordBatch {
+  uint64 first_offset = 1;  
+  repeated Record records = 3;
+}
+
+message Record {
+  bytes value = 1;
+  uint32 offset_delta = 2;
+}

@@ -12,24 +12,17 @@ message ProduceRequest  {
 }
 
 message ProduceResponse  {
-  Error error = 1;
+  uint64 first_offset = 1;
 }
 
 message ConsumeRequest {
-  uint64 offset = 1;
-  uint64 records = 2;
+  uint64 offset = 1;  
 }
 
 message ConsumeResponse {
-  Error error = 1;
   RecordBatch record_batch = 2;
 }
 
-message Error {
-  int32 code = 1;
-  string message = 2;    
-}
-  
 message RecordBatch {
   uint64 first_offset = 1;  
   repeated Record records = 3;

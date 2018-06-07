@@ -23,7 +23,7 @@ func (s *segment) Write(p []byte) (int, error) {
 		return 0, err
 	}
 	s.nextOffset++
-	s.position += n
+	s.position += uint64(n)
 	return n, nil
 }
 

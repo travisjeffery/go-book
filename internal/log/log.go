@@ -28,7 +28,7 @@ func (l *Log) AppendBatch(batch *api.RecordBatch) (uint64, error) {
 	l.activeSegment.index.writeEntry(entry{
 		offset:   offset,
 		position: position,
-		length:   batch.Size(),
+		length:   uint64(batch.Size()),
 	})
 	return offset, nil
 }

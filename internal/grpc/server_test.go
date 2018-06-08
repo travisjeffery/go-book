@@ -5,7 +5,6 @@ import (
 	"net"
 	"reflect"
 	"testing"
-	"time"
 
 	api "github.com/travisjeffery/go-book/api/v1"
 	"google.golang.org/grpc"
@@ -18,18 +17,15 @@ func TestServer(t *testing.T) {
 	check(t, err)
 	defer cc.Close()
 
-	ml := make(mocklog)
-	srv := NewAPI(ml)
+	ctx := context.Background()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
+	srv := NewAPI(make(mocklog))
 
 	go func() {
 		srv.Serve(l)
 	}()
 	defer func() {
 		srv.Stop()
-		cancel()
 		l.Close()
 	}()
 

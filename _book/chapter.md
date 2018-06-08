@@ -1,24 +1,20 @@
-# Client to server communication with grpc
+# Client to server communication with gRPC
 
-In the previous chapters we setup our project and protobufs, and wrote our commit log library. In
-this chapter we'll build on our library and turn it into a grpc web service and create both a server
+In the previous chapters we setup our project and protocol buffers, and wrote our commit log library. Here's what we have in store this chapter:
+
+- We'll build on our library and turn it into a gRPC web service and create both a server
 and client.
+- We'll define a gRPC service in protobuf.
+- We'll implement a gRPC server.
+- We'll create a gRPC client and test our server with it.
 
-- We'll see how to define a grpc service in protobuf.
-- We'll look at how to implement and test a grpc server.
-- We'll take advantage of how grpc provides us with a client for free.
+## Why gRPC?
 
-## Why grpc?
-
-grpc allows us to define our service once and then compile that into clients and servers in various
-languages that grpc supports. and even if your whole stack is go, grpc handles the efficient and
-type-checked serialization of type-checked request and responses, grpc gives us a client for free,
-and grpc enable us to easily build streaming apis.
+gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC makes it easy to build streaming APIs.
 
 ## Defining the service
 
-Open the protobuf file where we defined our RecordBatch and Record types in and add the following
-service definition.
+Open the protobuf file we defined our RecordBatch and Record types in and add the following service definition.
 
 ```
 service Log {
@@ -43,57 +39,37 @@ message ConsumeResponse {
 }
 ```
 
-This service API simply wraps our log library's API and is similar to the produce/consume API that
-Apache Kafka also uses. When compiled this will generate a LogServer and LogClient with
-corresponding Produce and Consume methods. We need to compile our protobuf with the grpc plugin.
+This service API simply wraps our log library's API and is similar to the produce/consume API that Apache Kafka uses - so we're in good company. When compiled, this protocal buffer will turn into a LogServer and LogClient featuring Produce and Consume methods. To do that, we need to compile our protobuf with a gRPC plugin.
 
-## Compiling with gogo's grpc plugin
+## Compiling with gogo's gRPC plugin
 
-In the root of our project update our build target like so to enable the grpc plugin and compile our
-grpc service. We're using the gogo protobuf grpc plugin rather than the one provided by
-golang/protobuf. gogo is a popular fork - used by etcd, kubernetes, dropbox, nats, cloudflare, and
-others. It provides extra code generation features for go, like being able to generate marshal and
-unmarshal and size methods for example which we'll be using, and also being able to embed fields and
-use custom types.
+Open up our Makefile and update our build target like so to enable the gRPC plugin and compile our gRPC service. We're using the [gogo protobuf](https://github.com/gogo/protobuf) gRPC plugin rather than the [one provided by the Golang team](http://github.com/golang/protobuf/). gogo is a popular fork used by Etcd, Kubernetes, Dropbox, Nats, Cloudflare, and others. It provides extra code generation features for Go, like being able to generate marshal, unmarshal, and size methods for example - which we'll be using - and is also able to embed fields and use custom types.
 
 ```
 build:
 	protoc -I api/v1/ api/v1/log.proto --gogofast_out=plugins=grpc:api/v1
+
+install.deps:
+    go get -u github.com/gogo/protobuf/protoc-gen-gogofast
 ```
 
-We need to install the protobuf compiler and protoc plugin for Go. If you're on a Mac you do:
+Run `$ make install.deps build`, open up the log.pb.go file in the api/v1 directory and check out the generated code. In there you'll see a working gRPC log client, but the log server is left only as an interface - that's because we need to implement it!
+
+## Implementing the gRPC server
+
+Create a internal/grpc directory tree in the root of your project[^1]. You can do that by running `mkdir -p internal/grpc`. In this directory we'll implement our server in a file called server.go and package named grpc.
+
+[^1]: "internal" directories/packages are magical packages in Go that can only be imported by nearby code.
+For example: code in /a/b/c/internal/d/e/f can be imported by code rooted by /a/b/c, but not code
+rooted by /a/b/g.
+
+The first order of business is to define our server type and a creator function.
 
 ```
-$ wget https://github.com/google/protobuf/releases/download/v3.5.0/protoc-3.5.0-osx-x86_64.zip && unzip protoc-3.5.0-osx-x86_64.zip -d /usr/local/bin/protoc
-$ export PATH="$PATH:/usr/local/bin/protoc/bin"
-$ go get -u github.com/gogo/protobuf/protoc-gen-gogofast
-```
-
-With those installed and our Makefile in place, we're ready to compile. In the root of your project
-run `$ make compile` and look inside the api/v1 directory, there's a new file: log.pb.go. Open it up and
-check out the generated code. In there you'll see a gRPC working client, the generated server is
-only an interface - it's up to us to implement it. Let's do it.
-
-Create internal/grpc directory tree in the root of your project[^1], you can do that by running `mkdir
--p internal/grpc`. In this directory we'll implement our server in a file called server.go:
-
-```
-package grpc
-
-import (
-	"context"
-
-	api "github.com/travisjeffery/go-book/api/v1"
-	"google.golang.org/grpc"
-)
-
 var _ api.LogServer = (*grpcServer)(nil)
 
-func NewAPI(log log) *grpc.Server {
-	g := grpc.NewServer()
-	s := newgrpcServer(log)
-	api.RegisterLogServer(g, s)
-	return g
+type grpcServer struct {
+	log log
 }
 
 func newgrpcServer(log log) *grpcServer {
@@ -101,11 +77,11 @@ func newgrpcServer(log log) *grpcServer {
 		log: log,
 	}
 }
+```
 
-type grpcServer struct {
-	log log
-}
+The first line is a trick to check that a type satisfies an interface at compile-time. To satisfy the interface you saw in log.pb.go we need to implement the Consume and Produce methods.
 
+```
 func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {
 	offset, err := s.log.AppendBatch(req.RecordBatch)
 	if err != nil {
@@ -121,18 +97,14 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api
 	}
 	return &api.ConsumeResponse{RecordBatch: batch}, nil
 }
-
-type log interface {
-	AppendBatch(*api.RecordBatch) (uint64, error)
-	ReadBatch(uint64) (*api.RecordBatch, error)
-}
 ```
 
-This is the beauty of library driven development, the code wrapping the libraries tends to be very
-simple.
+### Dependency inversion with interfaces
 
-`var _ api.LogServer = (*grpcServer)(nil)` checks that our type implements the interface we want it
-to, which in this case is our grpc server implementation.
+> High-level modules should not depend on low-level modules. Both should depend on abstractions. Abstractions should not depend on details. Details should depend on abstractions.
+> –Robert C. Martin
+
+Our server will depend on a log abstraction for it to do anything, generally that'll be our library, but we don't want to be tied to a specific implementation. Our log library stores the logs on disk, but our server doesn't care about the specifics - it only cares that the log it depends on satisfies the log abstraction it's looking for. We do this by defining our dependency as an interface. Aside from the abstract benefits, in practice this eases our server testing.
 
 
 ```
@@ -142,75 +114,92 @@ type log interface {
 }
 ```
 
-Defines our log interface. This way our server doesn't depend on a concrete implementation. We
-inject whatever implementation we want instead - maybe we're trying out a different implementation
-or maybe we're passing in a mocked log for our tests.
+## Registering your server
 
-Let's write a test with the grpc client hitting our server.
+Our server is implemented and we haven't done anything gRPC specific yet. We'll add an exported function to instantiate our server implementation, create a gRPC server, and register our implementation with it. The gRPC server will listen on the network, handle requests, call our server, and respond back to the client with the result.
+
+```
+func NewAPI(log log) *grpc.Server {
+	g := grpc.NewServer()
+	s := newgrpcServer(log)
+	api.RegisterLogServer(g, s)
+	return g
+}
+```
+
+## Testing a gRPC server, using a gRPC client
+
+With our gRPC server done let's write some tests and try hitting it with a gRPC client. In the same directory create a server_test.go file.
+
+We start by announcing a listener for our server on the local network address. The 0 port is useful for cases like this where we don't care what port we're using and using 0 will automatically assign us a free port. We then create an insecure connection to our listener and with it, a log client. We then create our server and start serving requests in a goroutine because the Serve method is a blocking call. Lastly, we defer a function that will stop our server and close its connection once our test finishes.
 
 ``` go
-package grpc
-
-import (
-	"context"
-	"net"
-	"reflect"
-	"testing"
-	"time"
-
-	api "github.com/travisjeffery/go-book/api/v1"
-	"google.golang.org/grpc"
-)
-
 func TestServer(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")[^2]
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	check(t, err)
 
-	cc, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
+    conn, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
 	check(t, err)
-	defer cc.Close()
+	defer conn.Close()
+
+    c := api.NewLogClient(conn)
 
     ctx := context.Background()
-	srv := NewAPI(make(mocklog)) // 1.
+	srv := NewAPI(make(mocklog))
 
 	go func() {
-		srv.Serve(l) // 1.
+		srv.Serve(l)
 	}()
 
 	defer func() {
-		srv.Stop() // 1.
+		srv.Stop()
 		l.Close()
 	}()
 
-	lc := api.NewLogClient(cc) // 1.
+    //...
+```
+
+Let's write the test - one that's nice and simple: produce a record batch to our server with our client and check that when we consume it we get the same record batch back.
+
+check is a helper function used to DRY up our error checking.
+
+``` go
+    //...
 
 	want := &api.RecordBatch{
 		Records: []*api.Record{{
 			Value: []byte("hello world"),
 		}},
 	}
-	produce, err := lc.Produce(context., &api.ProduceRequest{
+
+	produce, err := c.Produce(ctx, &api.ProduceRequest{
 		RecordBatch: want,
 	})
 	check(t, err)
 
-	consume, err := lc.Consume(ctx, &api.ConsumeRequest{
+	consume, err := c.Consume(ctx, &api.ConsumeRequest{
 		Offset: produce.FirstOffset,
 	})
 	check(t, err)
 
-	if !reflect.DeepEqual(want, consume.RecordBatch) {
-		t.Fatalf("API.Produce/Consume, got: %v, want %v", consume.RecordBatch, want)
+    got := consume.RecordBatch
+
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("API.Produce/Consume, got: %v, want %v", got, want)
 	}
 }
 
 func check(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
-		t.Fatal(err)b
+		t.Fatal(err)
 	}
 }
+```
 
+Back when we created our server, we made and passed in a mock log. The last piece is to implement our mock which keeps our test setup and cleanup simple and lets us focus on testing just our server. As discussed in *Dependency inversion with interfaces* we can pass in our mock since our server depends on our log interface so it doesn't care which specific implementation it uses.
+
+``` go
 type mocklog map[uint64]*api.RecordBatch
 
 func (m mocklog) AppendBatch(b *api.RecordBatch) (uint64, error) {
@@ -224,17 +213,8 @@ func (m mocklog) ReadBatch(off uint64) (*api.RecordBatch, error) {
 }
 ```
 
-- Create our API instance and pass in our mocked log implementation for the API to use so we can focos
-on writing and testing our server.
-- Tell the server to start handling requests.
-- Stop the server and close the listener to free the port.
-- Create our grpc client.
-- Produce to our API, consume from, and check that the record batch in the request and response
-  match.
+## What you learned
 
-[^1]: "internal" directories/packages are magical packages in Go that can only be imported by nearby code.
-For example: code in /a/b/c/internal/d/e/f can be imported by code rooted by /a/b/c, but not code
-rooted by /a/b/g.
+You hit the ground running with gRPC in this chapter. You learned how to define a gRPC service in protobuf, compile it into server and client code, implement the server, and test it with your client.
 
-[^2]: The 0 port is useful for tests because on unix systems a free port will automatically be
-    assigned.
+You know how to build a gRPC server and client and you can use your log over the network. Now we're going to make your log service distributed, turning multiple individual servers into a cluster, connecting them with service discovery and consensus.

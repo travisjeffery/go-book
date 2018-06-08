@@ -1,0 +1,73 @@
+* Real world Go: Building a distributed commit log
+
+* Sample chapter
+
+In the previous chapter we setup our project directories, wrote our initial protobuf structures
+defining our API and types. Now we're going to implement our commitlog. The heart of of our
+distributed commit log.
+
+What is a log? When most people think of logs they'll think of something that looks like... (TK picture) These
+are logs meant for humans to read. The log we're talking about, a commit log, meant to build programs on. Our
+commit log look something like... (TK picture) Our log is a append-only sequence of records ordered
+by time.
+
+So let's build one.
+
+First we'll define our API and types as protobufs.
+
+* Contents
+
+** Getting started
+
+- Project layout
+https://medium.com/@benbjohnson/standard-package-layout-7cdbc8391fc1
+Don't use the pkg dir
+
+- Protobufs
+Define the client and server and requests and messages.
+gRPC
+
+- Config
+HCL configuration in a file? Later kubernetes config map.
+
+- Making a modular CLI with cobra
+Used by kubernetes, docker, etc.
+
+** Commit log
+
+Implement the commit log.
+
+** Service discovery with Serf
+
+- Learn how to make services discovery each other.
+
+** Consensus with Raft
+
+- Learn how to coordinate nodes and ensure they know what each other knows.
+- Coordinate locations of topics and partitions.
+
+** Server
+
+Writing code to handle calls from clients and communicate with other servers.
+Using/writing gRPC middleware.
+
+** Client
+
+- Write code to servers.
+- Implement protobuf client.
+
+** Deploying with Kubernetes
+
+- GKE
+- Building an operator
+
+** Misc
+
+- Testing
+- Monitoring
+- Observability
+- Metrics
+- Distributed tracing jaegar.
+- Configuration - config map in kubernetes
+- Args
+- Documentation and Go Doc

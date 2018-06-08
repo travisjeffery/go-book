@@ -1,0 +1,134 @@
+* Programming Go
+
+** Overview
+
+   I'd like to write the book programmers read after learning Go and set out to take the next step
+   and build something with it.
+
+   Readers following the book will be led through building a real-world project, a distributed
+   commit log, and along the way learn the thinking, tools, and tricks a skilled Go programmer uses
+   every day.
+
+** What's covered
+
+   In 250 pages, this book will:
+
+   - Introduce the key concepts that will help Go programmers build real-world Go projects
+   - Show how to layout their projects into separate packages so their code is modular, easily
+   maintainable and and testable
+   - Show how to use the standard library they'll commonly use such as the io and net packages and
+   - Show how to test their services
+   - Show how to write a CLI and configure their service
+   - Show how to monitor their service with metrics, logs, traces
+   - Show how to work in-depth with the filesystem APIs by building a commit log like Kafka
+   - Show how to work with Protobufs/gRPC in depth, writing a gRPC server and client
+     third party packages they'll find useful
+   - Show how to build a distributed service with service discovery and consensus
+   - Show how to deploy it using Kubernetes and write their own operator to manage it
+
+** Audience
+
+   This book is suitable for programmers who've learned the language, maybe they were hired to work at
+   a company that uses Go, maybe they've read The Go Programming Language - they've got their feet wet
+   and want a jumpstart in becoming a skilled Go programmer and make something with substance.
+
+** Why is your book different?
+
+   This is the only Go book which covers the breadth and depth of Go in practice - beyond the
+   language, the working programmer's Go book - using Go in the real world to build stuff. My book
+   will provide and connect the dots to make a productive Go programmer.
+
+   The Go books available today are aimed at programmers learning the language fresh, covering the
+   syntax of the language with simple examples. Or they're cookbooks providing interesting snippets
+   without substance, without a story, without a workflow - these books provide dots left unconnected.
+
+** What will readers be able to do they couldn't before?
+
+   They will be able to use Go to build and deploy their own production-ready projects in Go, from CLIs
+   to clients and servers to distributed systems. They will be productive Go programmers with a
+   toolkit ready to take on nearly all Go projects they'll face.
+
+** Why we should get excited about your topic
+
+   Go is going through a growth explosion, with more and more projects and companies using it every
+   day. Despite that, there's a hole in the book's available on how to put Go to work. My book hopes
+   to fill that gap and provide the book I, and many of my peers, would've loved to read starting
+   out, and the waves of programmers learning Go everday will find it useful.
+
+** Promotional strategy
+
+   I'm well known in the Go community having written a various Go projects and being a [[http://github.com/travisjeffery/][prolific open
+   source contributor for over a decade]], I implemented my own Kafka called Jocko in Go and was a
+   [[https://changelog.com/gotime/31][guest on the most popular Go podcast /Go Time/]], so I think a word-of-mouth social media campaign
+   would be effective.
+
+   - *Promotion by me on social media.* I have ~2400 followers on Twitter, ~2000 following my blog
+     on Medium which was viewed ~150,000 times last year, ~750 followers on GitHub where my projects
+     get ~2000 visits a day. So I will convert by blogging, tweeting, and posting on Hacker News,
+     Reddit, Quora, etc., including the link in the READMEs of my projects.
+   - *Promotion by me at conferences and meetups.* I am speaking at Kafka summit this fall, a Terraform
+     meetup in June, and am currently scheduling a few other meetups to speak at and I would promote my
+     book at these.
+   - *Promotion by influences.* I correspond/am connected with figureheads in the community like
+     [[https://twitter.com/bketelsen][Brian Ketelsen]], [[https://twitter.com/erikstmartin][Erik
+     St.Martin]], [[https://twitter.com/tjholowaychuk][TJ Holowaychuk]],
+     [[https://twitter.com/benbjohnson][Ben Johnson]] who I think would help promote the book.
+   - *"Recommended books" lists.* I'd get my book on all the recommended Go books lists on the web by
+     reaching out the authors or adding it myself where I can.
+   - *Mailing list* I have a mailing list with 600 people who've follow my writing and I'd be promoting
+   the book to them as well.
+
+** Competing books
+
+   There is no direct competition, as this is the only book covering building a substantial Go
+   project start to finish applying day-to-day working habits. Most Go books today are about the
+   language itself, others are cookbooks primarily made up of short how-to's.
+
+*** Language books
+
+    - [[https://www.amazon.com/Programming-Language-Addison-Wesley-Professional-Computing/dp/0134190440/ref=sr_1_1?s=books&ie=UTF8&qid=1528006212&sr=1-1&keywords=golang][The Go Programming Language by ]]Alan A. A. Donovan and Brian W. Kernighan (Addison-Wesley
+      Professional, 2015, 400 pages). The most popular Go book - it's a good book, written by
+      Kernighan, and promoted by the Go team.
+    - [[https://www.amazon.ca/Introducing-Go-Reliable-Scalable-Programs/dp/1491941952/ref=sr_1_3?ie=UTF8&qid=1528006444&sr=8-3&keywords=golang][Introducing Go by Caleb Doxsey (O'Reilly, 2016, 124 pages)]]. Very short intro/overview of the language.
+    - [[https://www.amazon.ca/Go-Action-William-Kennedy/dp/1617291781/ref=sr_1_4?ie=UTF8&qid=1528006444&sr=8-4&keywords=golang][Go in Action by Wiliam Kennedy, with Brian Ketelsen and Erik St. Martin]] (Manning, 2015, 264
+      pages). Introduces the language and a bit of the standard lib.
+
+*** Cookbooks
+
+    - [[https://www.amazon.com/Go-Programming-Blueprints-Mat-Ryer/dp/1783988029/ref=smi_www_rco2_go_smi_1968491462?_encoding=UTF8&*Version*=1&*entries*=0&pf_rd_p=1968491462&pf_rd_s=smile-campaign&pf_rd_t=201&pf_rd_i=1783988029&pf_rd_m=ATVPDKIKX0DER&pf_rd_r=12JKQ7DEBQ078CYSYY0X&pldnSite=1][Go Programming Blueprints by Mat Ryer (Packt, 2015, 215 pages)]]. Perhaps the most similar book
+      to mine, starts by building a chat app the first half, the last half loses the plot and is
+      made up of unlrelated example projects.
+    - [[https://www.amazon.com/Go-Practice-Techniques-Matt-Butcher/dp/1633430073/ref=sr_1_5?s=books&ie=UTF8&qid=1528006212&sr=1-5&keywords=golang][Go in Practice by Matt Butcher and Matt Farina (Manning, 2016, 312 pages).]] First half is
+      background on the language, last half are shorter how-tos focused on buliding web apps.
+    - [[https://www.amazon.ca/Web-Programming-Sau-Sheong-Chang/dp/1617292567/ref=sr_1_5?ie=UTF8&qid=1528006444&sr=8-5&keywords=golang][Go Web Programming by Sau Sheong Chang (Manning, 2016, 285 pages)]]. Good book written for
+      people learning Go to write web apps.
+
+** Market information
+
+   Russ Cox (lead developer of Go at Google) conservatively estimates the number of Go programmers
+   at over one million on the [[https://changelog.com/gotime/77][Go Time podcast on April 23, 2018]], up from half a million last summer.
+
+   Go sits amongst the 10-15th position on the TIOBE index.
+
+** My bio
+
+   I've been programming for over 15 years and hit the ground running by contributing to open source
+   projects almost from the start.
+
+   I've programmed in nearly all programming fields, from frontend to backend, from mobile to
+   distributed systems. My strength and interest has always been systems programming however and that's
+   what drew me to Go.
+
+   I've been writing Go since the first major release in 2012 and have been writing it daily in both my
+   professional and open source careers. I love Go's simplicity, practicality, and versatility.
+
+   I've also been writing technical content for over 10 years, writing about problems I've faced and
+   solutions I found, how-tos, and workflow tips. I put more effort into my programming and writing
+   than anything else. I strive for simple, clear prose and write like I talk. The feedback I've
+   received over the years shows I'm on the right track -
+   [[https://thehoard.blog/how-kafkas-storage-internals-work-3a29b02e026][for example, see the
+   responses to this article]].
+
+   I've always strove to help people with my writing: writing open source software, or writing blog
+   posts to explain technical stuff. I've always wanted to write a book and I'm thankful for the
+   opportunity.

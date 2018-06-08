@@ -1,0 +1,35 @@
+* Outline
+
+1. Getting started on your project
+- Layout the project
+- Define your APIs with gRPC/Protobuf
+- Manage dependencies
+2. Work with the filesystem
+- Build a commit log library
+- Write good documentation
+3. Client to server communication
+- Build a gRPC server
+- Write a gRPC client
+- Create and configure CLIs
+4. Develop and debug with tooling
+- Log, monitor, and trace
+- Profile with pprof
+- Debug with Delve
+- Generate Go code
+5. Server to server communication
+- Discover other servers
+- Coordinate your servers
+- Handle lost nodes
+6. Test Go projects
+- Table-driven tests
+- Inject dependencies
+- Networking
+- Remove race conditions
+7. Write fast Go
+- Benchmark code
+- Optimize memory usage
+- Concurrency
+8. Deploying with Kubernetes
+- Build an operator
+- Deploy to GKE
+- Hit your service

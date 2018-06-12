@@ -8,9 +8,16 @@ and client.
 - We'll implement a gRPC server.
 - We'll create a gRPC client and test our server with it.
 
-## Why gRPC?
+## What is gRPC?
 
-gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC makes it easy to build streaming APIs.
+gRPC is a high performance RPC framework open sourced by Google. In gGRPC - being RPC (remote
+procedure call) - client applications call methods on a server application on a different machine as
+if it were a local object, reducing the gap between working on programs that run on a single
+computer and working on programs that run on many computers over a network. The server implements an
+interface and runs a server to handle gRPC client calls, and the client provides the same methods as
+the server,
+
+So why use gRPC? gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC makes it easy to build streaming APIs.
 
 ## Defining the service
 
@@ -79,7 +86,7 @@ func newgrpcServer(log log) *grpcServer {
 }
 ```
 
-The first line is a trick to check that a type satisfies an interface at compile-time. To satisfy the interface you saw in log.pb.go we need to implement the Consume and Produce methods.
+The first line is a trick to check that a type satisfies an interface at compile-time. This will help you - the person implementing this type - know when you've fulfilled the requirements. Afterwards it'll help your teammate - the  know what they can or can't change, it acts like type-checked code documentation. To satisfy the interface you saw in log.pb.go we need to implement the Consume and Produce methods.
 
 ```
 func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {

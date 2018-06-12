@@ -1,23 +1,36 @@
 # Client to server communication with gRPC
 
-In the previous chapters we setup our project and protocol buffers, and wrote our commit log library. Here's what we have in store this chapter:
+In the previous chapters we setup our project and protocol buffers, and wrote our commit log library. Starting with a library first helps you focus on writing a flexible and robust API, you don't have to completely ignore the requirements of the end program, but it can be beneficial to ignore it while working on the library. The resulting program we're building should ideally be nothing more than a small layer that ties together configuration and underlying libraries implemented to fulfill its needs.
 
-- We'll build on our library and turn it into a gRPC web service and create both a server
-and client.
-- We'll define a gRPC service in protobuf.
-- We'll implement a gRPC server.
-- We'll create a gRPC client and test our server with it.
+Currently, our library can only be used on a single computer by a single person at a time, and that person has to run our code, learn our library's API, and store the log on their disk. These are three of the primary reasons why we write services: to take advantage of running over multiple computers, to enable multiple people to interact with the same the data, and to provide a more accessible means of use.
+
+In this chapter, we're gonna build on our library and make a service that other people can call over the network. In doing so we'll face some the following problems/goals all programmers face when building networked services:
+
+- **Ease to build**: Networked communication is technical and complex and we want to focus on the problem our service is built to solve, rather than the technical minutiae of request-response serialization, and so on.
+
+- **Maintainability**: Writing the first version of a service is a relatively brief period in the time you'll be working on it. Once our service is live and people depend on it we often must maintain backwards compatibility, which is usually done by versioning/running multiple instances of your API.
+
+- **Security**: With our service exposed on a network we also expose it to whoever is on that network, potentially the entire internet. It's important we can control who has access to our service and permit what they can do.
+
+- **Ease of use**: We want to enable users of our service to use our service as intended. When using a library the documentation is often immediately accessible and clearly errors when something goes wrong, often neither of which is the case with services.
+
+- **Performance**: We want our service to be fast. [Amazon found every 100ms of latency cost them 1% in sales](https://www.fastcompany.com/1825005/how-one-second-could-cost-amazon-16-billion-sales) - that's 1.6 billion! [Google found an extra .5 seconds in search page generation time dropped traffic by 20%](http://glinden.blogspot.com/2006/11/marissa-mayer-at-web-20.html).
+
+- **Scalability**: We want to easily scale up our service the more it's used by balancing the load across multiple computers.
+
+To write our service we'll be using gRPC which has the following advantages over REST:
+
+- gRPC transparently handles the serialization of our requests and responses.
+- gRPC eases versioning our services and running multiple services at the same time.
+- gRPC checks client calls are type-safe and tells the user they're making a bad call.
+- gRPC speeds up request handling, your service will be about [25 times](https://husobee.github.io/golang/rest/grpc/2016/05/28/golang-rest-v-grpc.html) faster than the equivalent REST service.
+- gRPC supports load balancing built-in.
 
 ## What is gRPC?
 
-gRPC is a high performance RPC framework open sourced by Google. In gGRPC - being RPC (remote
-procedure call) - client applications call methods on a server application on a different machine as
-if it were a local object, reducing the gap between working on programs that run on a single
-computer and working on programs that run on many computers over a network. The server implements an
-interface and runs a server to handle gRPC client calls, and the client provides the same methods as
-the server,
+gRPC is a high performance RPC framework open sourced by Google. In gGRPC - being RPC (remote procedure call) - client applications call methods on a server application on a different machine as if it were a local object. It enables client and server applications to communicate transparently, and makes it easier to build connected systems.
 
-So why use gRPC? gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC makes it easy to build streaming APIs.
+Why use gRPC? gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC also makes it easy to build streaming APIs. gRPC is also extendable and has an active community building
 
 ## Defining the service
 

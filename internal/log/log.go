@@ -1,47 +1,58 @@
 package log
 
 import (
+	"fmt"
 	"sync"
 
 	api "github.com/travisjeffery/go-book/api/v1"
 )
 
 type Log struct {
-	activeSegment *segment
 	mu            sync.RWMutex
-	path          string
+	Dir           string
+	activeSegment *segment
 	segments      []*segment
 }
 
 func (l *Log) AppendBatch(batch *api.RecordBatch) (uint64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.init()
 	b, err := batch.Marshal()
 	if err != nil {
 		return 0, err
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	offset, position := l.activeSegment.nextOffset, l.activeSegment.position
 	_, err = l.activeSegment.Write(b)
 	if err != nil {
 		return 0, err
 	}
-	l.activeSegment.index.writeEntry(entry{
-		offset:   offset,
-		position: position,
-		length:   uint64(batch.Size()),
-	})
+	if err = l.activeSegment.index.writeEntry(entry{
+		Offset:   offset,
+		Position: position,
+		Length:   uint64(batch.Size()),
+	}); err != nil {
+		fmt.Println(err)
+		return 0, err
+	}
 	return offset, nil
 }
 
 func (l *Log) ReadBatch(offset uint64) (*api.RecordBatch, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	l.init()
+	if l.activeSegment.nextOffset == 0 ||
+		l.activeSegment.nextOffset <= offset {
+		fmt.Println("heyheyhey")
+		return nil, api.ErrOffsetOutOfRange
+	}
 	entry, err := l.activeSegment.index.readEntry(offset)
 	if err != nil {
 		return nil, err
 	}
-	p := make([]byte, entry.length)
-	_, err = l.activeSegment.ReadAt(p, int64(entry.position))
+	p := make([]byte, entry.Length)
+	_, err = l.activeSegment.ReadAt(p, int64(entry.Position))
 	if err != nil {
 		return nil, err
 	}
@@ -49,4 +60,13 @@ func (l *Log) ReadBatch(offset uint64) (*api.RecordBatch, error) {
 	err = batch.Unmarshal(p)
 	return batch, err
 
+}
+
+func (l *Log) init() {
+	if l.activeSegment == nil {
+		l.activeSegment = &segment{
+			dir: l.Dir, firstOffset: 0,
+			index: &index{dir: l.Dir, firstOffset: 0},
+		}
+	}
 }

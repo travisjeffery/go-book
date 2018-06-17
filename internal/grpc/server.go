@@ -9,21 +9,21 @@ import (
 
 var _ api.LogServer = (*grpcServer)(nil)
 
-func NewAPI(log log) *grpc.Server {
+func NewAPI(log logger) *grpc.Server {
 	g := grpc.NewServer()
 	s := newgrpcServer(log)
 	api.RegisterLogServer(g, s)
 	return g
 }
 
-func newgrpcServer(log log) *grpcServer {
+func newgrpcServer(log logger) *grpcServer {
 	return &grpcServer{
 		log: log,
 	}
 }
 
 type grpcServer struct {
-	log log
+	log logger
 }
 
 func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {
@@ -42,7 +42,7 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api
 	return &api.ConsumeResponse{RecordBatch: batch}, nil
 }
 
-type log interface {
+type logger interface {
 	AppendBatch(*api.RecordBatch) (uint64, error)
 	ReadBatch(uint64) (*api.RecordBatch, error)
 }

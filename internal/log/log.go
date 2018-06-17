@@ -32,7 +32,6 @@ func (l *Log) AppendBatch(batch *api.RecordBatch) (uint64, error) {
 		Position: position,
 		Length:   uint64(batch.Size()),
 	}); err != nil {
-		fmt.Println(err)
 		return 0, err
 	}
 	return offset, nil

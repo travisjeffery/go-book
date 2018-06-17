@@ -42,6 +42,20 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api
 	return &api.ConsumeResponse{RecordBatch: batch}, nil
 }
 
+func (s *grpcServer) ConsumeStream(req *api.ConsumeRequest, stream api.Log_ConsumeStreamServer) error {
+	offset := req.Offset
+	for {
+		batch, err := s.log.ReadBatch(offset)
+		if err != nil {
+			return err
+		}
+		if err = stream.Send(&api.ConsumeResponse{RecordBatch: batch}); err != nil {
+			return err
+		}
+		offset++
+	}
+}
+
 type logger interface {
 	AppendBatch(*api.RecordBatch) (uint64, error)
 	ReadBatch(uint64) (*api.RecordBatch, error)

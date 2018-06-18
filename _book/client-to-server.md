@@ -1,10 +1,6 @@
 # Client to server communication with gRPC
 
-In the previous chapters we setup our project and protocol buffers, and wrote our commit log library.
-
-## Library first, then API, then CLI
-
-Starting with a library first helps you focus on writing a flexible and robust API, you don't have to completely ignore the requirements of the end program, but it can be beneficial to ignore it while working on the library. The resulting program we're building should ideally be nothing more than a small layer that ties together configuration and underlying libraries implemented to fulfill its needs.
+In the previous chapters we setup our project and protocol buffers, and wrote our commit log library. Starting with a library first helps you focus on writing a flexible and robust API, you don't have to completely ignore the requirements of the end program, but it can be beneficial to ignore it while working on the library. The resulting program we're building should ideally be nothing more than a small layer that ties together configuration and underlying libraries implemented to fulfill its needs.
 
 Currently, our library can only be used on a single computer by a single person at a time, and that person has to run our code, learn our library's API, and store the log on their disk. These are three of the primary reasons why we write services: to take advantage of running over multiple computers, to enable multiple people to interact with the same the data, and to provide a more accessible means of use.
 
@@ -193,16 +189,18 @@ func TestServer(t *testing.T) {
 }
 ```
 
-Our table is empty though so let's start adding test cases. The initial test case will test what happens when a user consumes the initial, empty state of the log. Add the test case to the table.
+Our table is empty though so let's start adding test cases. The initial test case will test what happens when a user consumes the initial, empty state of the log. The second case tests a successful produce and consume. And the final case tests what happens when the consumer reaches teh end of the log. Add the test cases to the table.
 
 ```
 for scenario, fn := range map[string]func(t *testing.T, srv *grpc.Server, client api.LogClient){
-	"consume empty log fails": testConsumeEmpty,
+  	"consume empty log fails":                             testConsumeEmpty,
+	"produce/consume a message to/from the log succeeeds": testProduceConsume,
+	"consume past log boundary fails":                     testConsumePastBoundary,
 } {
 //...
 ```
 
-And define our test case checking that the returned batch is nil and that we get the error returned by our log library: ErrOffsetOutOfRange. The code we defined the error with is included in the response, and we can look it up with grpc's Code() function. Similarly, you can look up its description via the ErrorDesc() function. The error's code and description provide information to the caller on what went wrong, similar to HTTP status codes.
+Now implement our test cases. In the initial case we check that the returned batch is nil and that we get the ErrOffsetOutOfRange error returned by our log library. The code we defined the error with is included in the response, and we can look it up with grpc's Code() function. Similarly, you can look up its description via the ErrorDesc() function. The error's code and description provide information to the caller on what went wrong, similar to HTTP status codes.
 
 ```
 func testConsumeEmpty(t *testing.T, srv *grpc.Server, client api.LogClient) {
@@ -219,12 +217,9 @@ func testConsumeEmpty(t *testing.T, srv *grpc.Server, client api.LogClient) {
 		t.Fatalf("got err: %v, want: %v", err, api.ErrOffsetOutOfRange)
 	}
 }
-```
 
-check is a helper function used to DRY up our error checking.
-
-``` go
-    //...
+func testProduceConsume(t *testing.T, srv *grpc.Server, client api.LogClient) {
+	ctx := context.Background()
 
 	want := &api.RecordBatch{
 		Records: []*api.Record{{
@@ -232,44 +227,58 @@ check is a helper function used to DRY up our error checking.
 		}},
 	}
 
-	produce, err := c.Produce(ctx, &api.ProduceRequest{
+	produce, err := client.Produce(context.Background(), &api.ProduceRequest{
 		RecordBatch: want,
 	})
 	check(t, err)
 
-	consume, err := c.Consume(ctx, &api.ConsumeRequest{
+	consume, err := client.Consume(ctx, &api.ConsumeRequest{
 		Offset: produce.FirstOffset,
 	})
 	check(t, err)
-
-    got := consume.RecordBatch
-
-	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("API.Produce/Consume, got: %v, want %v", got, want)
-	}
+	equal(t, consume.RecordBatch, want)
 }
 
+func testConsumePastBoundary(t *testing.T, srv *grpc.Server, client api.LogClient) {
+	ctx := context.Background()
+
+	produce, err := client.Produce(ctx, &api.ProduceRequest{
+		RecordBatch: &api.RecordBatch{
+			Records: []*api.Record{{
+				Value: []byte("hello world"),
+			}},
+		},
+	})
+	check(t, err)
+
+	consume, err := client.Consume(ctx, &api.ConsumeRequest{
+		Offset: produce.FirstOffset + 1,
+	})
+	if consume != nil {
+		t.Fatal("consume not nil")
+	}
+	if grpc.Code(err) != grpc.Code(api.ErrOffsetOutOfRange) {
+		t.Fatalf("got err: %v, want: %v", err, api.ErrOffsetOutOfRange)
+	}
+}
+```
+
+check is a helper function used to DRY up our error checking. Similarly, equal is a helper function used to DRY up our equality checking.
+
+``` go
 func check(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
-```
 
-Back when we created our server, we made and passed in a mock log. The last piece is to implement our mock which keeps our test setup and cleanup simple and lets us focus on testing just our server. As discussed in *Dependency inversion with interfaces* we can pass in our mock since our server depends on our log interface so it doesn't care which specific implementation it uses.
 
-``` go
-type mocklog map[uint64]*api.RecordBatch
-
-func (m mocklog) AppendBatch(b *api.RecordBatch) (uint64, error) {
-	off := uint64(len(m))
-	m[off] = b
-	return off, nil
-}
-
-func (m mocklog) ReadBatch(off uint64) (*api.RecordBatch, error) {
-	return m[off], nil
+func equal(t *testing.T, got, want interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got: %v, want %v", got, want)
+	}
 }
 ```
 
@@ -329,8 +338,60 @@ func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
 }
 ```
 
-We'll add tests for our stream methods and see how streaming works from the client-side.
+Let's add a test for our stream methods and see how streaming works from the client-side.
 
+Add a case to our table.
+
+```
+for scenario, fn := range map[string]func(t *testing.T, srv *grpc.Server, client api.LogClient){
+		"consume empty log fails":                             testConsumeEmpty,
+		"produce/consume a message to/from the log succeeeds": testProduceConsume,
+		"consume past log boundary fails":                     testConsumePastBoundary,
+		"produce/consume stream succeeds":                     testProduceConsumeStream,
+	} {...}
+```
+
+And implement the test.
+
+```
+func testProduceConsumeStream(t *testing.T, srv *grpc.Server, client api.LogClient) {
+	ctx := context.Background()
+
+	batches := []*api.RecordBatch{{
+		Records: []*api.Record{{
+			Value: []byte("first message"),
+		}},
+	}, {
+		Records: []*api.Record{{
+			Value: []byte("second message"),
+		}},
+	}}
+
+	{
+		stream, err := client.ProduceStream(ctx)
+		check(t, err)
+
+		for _, batch := range batches {
+			err = stream.Send(&api.ProduceRequest{
+				RecordBatch: batch,
+			})
+			check(t, err)
+		}
+
+	}
+
+	{
+		stream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: 0})
+		check(t, err)
+
+		for _, batch := range batches {
+			res, err := stream.Recv()
+			check(t, err)
+			equal(t, res.RecordBatch, batch)
+		}
+	}
+}
+```
 
 ## What you learned
 

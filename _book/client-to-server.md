@@ -1,22 +1,26 @@
 # Client to server communication with gRPC
 
-In the previous chapters we setup our project and protocol buffers, and wrote our commit log library. Starting with a library first helps you focus on writing a flexible and robust API, you don't have to completely ignore the requirements of the end program, but it can be beneficial to ignore it while working on the library. The resulting program we're building should ideally be nothing more than a small layer that ties together configuration and underlying libraries implemented to fulfill its needs.
+In the previous chapters we setup our project and protocol buffers, and wrote our commit log library.
+
+## Library first, then API, then CLI
+
+Starting with a library first helps you focus on writing a flexible and robust API, you don't have to completely ignore the requirements of the end program, but it can be beneficial to ignore it while working on the library. The resulting program we're building should ideally be nothing more than a small layer that ties together configuration and underlying libraries implemented to fulfill its needs.
 
 Currently, our library can only be used on a single computer by a single person at a time, and that person has to run our code, learn our library's API, and store the log on their disk. These are three of the primary reasons why we write services: to take advantage of running over multiple computers, to enable multiple people to interact with the same the data, and to provide a more accessible means of use.
 
 In this chapter, we're gonna build on our library and make a service that other people can call over the network. In doing so we'll face some the following problems/goals all programmers face when building networked services:
 
-- **Ease to build**: Networked communication is technical and complex and we want to focus on the problem our service is built to solve, rather than the technical minutiae of request-response serialization, and so on.
+- **Simple**: Networked communication is technical and complex and we want to focus on the problem our service is built to solve, rather than the technical minutiae of request-response serialization, and so on.
 
-- **Maintainability**: Writing the first version of a service is a relatively brief period in the time you'll be working on it. Once our service is live and people depend on it we often must maintain backwards compatibility, which is usually done by versioning/running multiple instances of your API.
+- **Maintainable**: Writing the first version of a service is a relatively brief period in the time you'll be working on it. Once our service is live and people depend on it we often must maintain backwards compatibility, which is usually done by versioning/running multiple instances of your API.
 
-- **Security**: With our service exposed on a network we also expose it to whoever is on that network, potentially the entire internet. It's important we can control who has access to our service and permit what they can do.
+- **Secure**: With our service exposed on a network we also expose it to whoever is on that network, potentially the entire internet. It's important we can control who has access to our service and permit what they can do.
 
-- **Ease of use**: We want to enable users of our service to use our service as intended. When using a library the documentation is often immediately accessible and clearly errors when something goes wrong, often neither of which is the case with services.
+- **Usable**: We want to enable users of our service to use our service as intended. When using a library the documentation is often immediately accessible and clearly errors when something goes wrong, often neither of which is the case with services.
 
-- **Performance**: We want our service to be fast. [Amazon found every 100ms of latency cost them 1% in sales](https://www.fastcompany.com/1825005/how-one-second-could-cost-amazon-16-billion-sales) - that's 1.6 billion! [Google found an extra .5 seconds in search page generation time dropped traffic by 20%](http://glinden.blogspot.com/2006/11/marissa-mayer-at-web-20.html).
+- **Performant**: We want our service to be fast. [Amazon found every 100ms of latency cost them 1% in sales](https://www.fastcompany.com/1825005/how-one-second-could-cost-amazon-16-billion-sales) - that's 1.6 billion! [Google found an extra .5 seconds in search page generation time dropped traffic by 20%](http://glinden.blogspot.com/2006/11/marissa-mayer-at-web-20.html).
 
-- **Scalability**: We want to easily scale up our service the more it's used by balancing the load across multiple computers.
+- **Scales**: We want to easily scale up our service the more it's used by balancing the load across multiple computers.
 
 To write our service we'll be using gRPC which has the following advantages over REST:
 
@@ -26,13 +30,15 @@ To write our service we'll be using gRPC which has the following advantages over
 - gRPC speeds up request handling, your service will be about [25 times](https://husobee.github.io/golang/rest/grpc/2016/05/28/golang-rest-v-grpc.html) faster than the equivalent REST service.
 - gRPC supports load balancing built-in.
 
-## What is gRPC?
+What is gRPC? gRPC is a high performance RPC framework open sourced by Google. In gGRPC - being RPC (remote procedure call) - client applications call methods on a server application on a different machine as if it were a local object. It enables client and server applications to communicate transparently, and makes it easier to build connected systems.
 
-gRPC is a high performance RPC framework open sourced by Google. In gGRPC - being RPC (remote procedure call) - client applications call methods on a server application on a different machine as if it were a local object. It enables client and server applications to communicate transparently, and makes it easier to build connected systems.
+Why use gRPC? gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC also makes it easy to build streaming APIs. gRPC is also extendable with an active community working on doing so.
 
-Why use gRPC? gRPC allows us to define our service once and then compile that into clients and servers in various languages that gRPC supports. Even if your whole stack is Go, gRPC is worth using because it provides efficient, type-checked serialization of your requests and responses; it generates clients for free; and gRPC also makes it easy to build streaming APIs. gRPC is also extendable and has an active community building
+What can you build with gRPC? gRPC can be used anywhere with request-response communication, you can even use it for bidirectional streaming RPC where client and server send messages back and forth using a read-write stream. Anywhere you're using REST/HTTP and you control the clients you could use gRPC instead - and often benefit. REST allows you to loosely couple your server and clients by implementing [hypermedia](https://en.wikipedia.org/wiki/HATEOAS). When using hypermedia REST services, the REST client enters the application through a fixed URL and all future actions the client can take are discovered within resource representations returned from the server - it's like how you browse the web with the hyperlinks on each page telling you where you can go next. However, hypermedia is not straightforward to build, nor use, and often not necessary since the server and client are co-developed, and they can take advantage of that. Furthermore, REST is all about resources. Resources are easy to reason about when the resources are tangible, but harder to reason about when intangible - the user's session as a resource or password reset as a resource in a web app, for instance. On other hand, RPC is all about APIs and actions. This makes RPC more accessible and more intuitive because it's matches how we think in the real world - you don't want to create a password reset - you want to reset your password.
 
-## Defining the service
+Let's build your first, of many, gRPC services.
+
+## Define the service
 
 Open the protobuf file we defined our RecordBatch and Record types in and add the following service definition.
 
@@ -61,7 +67,7 @@ message ConsumeResponse {
 
 This service API simply wraps our log library's API and is similar to the produce/consume API that Apache Kafka uses - so we're in good company. When compiled, this protocal buffer will turn into a LogServer and LogClient featuring Produce and Consume methods. To do that, we need to compile our protobuf with a gRPC plugin.
 
-## Compiling with gogo's gRPC plugin
+## Compile with gogo's gRPC plugin
 
 Open up our Makefile and update our build target like so to enable the gRPC plugin and compile our gRPC service. We're using the [gogo protobuf](https://github.com/gogo/protobuf) gRPC plugin rather than the [one provided by the Golang team](http://github.com/golang/protobuf/). gogo is a popular fork used by Etcd, Kubernetes, Dropbox, Nats, Cloudflare, and others. It provides extra code generation features for Go, like being able to generate marshal, unmarshal, and size methods for example - which we'll be using - and is also able to embed fields and use custom types.
 
@@ -134,7 +140,7 @@ type log interface {
 }
 ```
 
-## Registering your server
+## Register your server
 
 Our server is implemented and we haven't done anything gRPC specific yet. We'll add an exported function to instantiate our server implementation, create a gRPC server, and register our implementation with it. The gRPC server will listen on the network, handle requests, call our server, and respond back to the client with the result.
 
@@ -147,39 +153,73 @@ func NewAPI(log log) *grpc.Server {
 }
 ```
 
-## Testing a gRPC server, using a gRPC client
+## Test your gRPC server and use a gRPC client
 
 With our gRPC server done let's write some tests and try hitting it with a gRPC client. In the same directory create a server_test.go file.
 
-We start by announcing a listener for our server on the local network address. The 0 port is useful for cases like this where we don't care what port we're using and using 0 will automatically assign us a free port. We then create an insecure connection to our listener and with it, a log client. We then create our server and start serving requests in a goroutine because the Serve method is a blocking call. Lastly, we defer a function that will stop our server and close its connection once our test finishes.
+Our tests will [table driven](https://github.com/golang/go/wiki/TableDrivenTests). With table driven tests, each entry is a complete and concisely written test case. The entry may be structure or function defining the input and expected results. If you find yourself using copy and paste when writing a test, consider refactoring the code to be table driven or into a helper function.
+
+We start by defining our top-level test function TestServer which will contain and run the test table, including the setup common for each test case. For us that setup includes creating a listener for our server on the local network address. The 0 port is useful for cases like this where we don't care what port we're using and using 0 will automatically assign us a free port. We create an insecure connection to our listener and with it, a log client. We create our server and start serving requests in a goroutine because the Serve method is a blocking call and our test case would never run otherwise. We defer a function that will stop our server and close its connection once our test case finishes. Finally we call the function representing our test case and past in our setup server and client for it to use.
 
 ``` go
 func TestServer(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	check(t, err)
+	for scenario, fn := range map[string]func(t *testing.T, srv *grpc.Server, client api.LogClient){} {
+		t.Run(scenario, func(t *testing.T) {
+			l, err := net.Listen("tcp", "127.0.0.1:0")
+			check(t, err)
 
-    conn, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
-	check(t, err)
-	defer conn.Close()
+			cc, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
+			check(t, err)
+			defer cc.Close()
 
-    c := api.NewLogClient(conn)
+			dir, err := ioutil.TempDir("", "server-test")
+			check(t, err)
 
-    ctx := context.Background()
-	srv := NewAPI(make(mocklog))
+			srv := NewAPI(&log.Log{Dir: dir})
 
-	go func() {
-		srv.Serve(l)
-	}()
+			go func() {
+				srv.Serve(l)
+			}()
+			defer func() {
+				srv.Stop()
+				l.Close()
+			}()
 
-	defer func() {
-		srv.Stop()
-		l.Close()
-	}()
+			client := api.NewLogClient(cc)
 
-    //...
+			fn(t, srv, client)
+		})
+	}
+}
 ```
 
-Let's write the test - one that's nice and simple: produce a record batch to our server with our client and check that when we consume it we get the same record batch back.
+Our table is empty though so let's start adding test cases. The initial test case will test what happens when a user consumes the initial, empty state of the log. Add the test case to the table.
+
+```
+for scenario, fn := range map[string]func(t *testing.T, srv *grpc.Server, client api.LogClient){
+	"consume empty log fails": testConsumeEmpty,
+} {
+//...
+```
+
+And define our test case checking that the returned batch is nil and that we get the error returned by our log library: ErrOffsetOutOfRange. The code we defined the error with is included in the response, and we can look it up with grpc's Code() function. Similarly, you can look up its description via the ErrorDesc() function. The error's code and description provide information to the caller on what went wrong, similar to HTTP status codes.
+
+```
+func testConsumeEmpty(t *testing.T, srv *grpc.Server, client api.LogClient) {
+	consume, err := client.Consume(context.Background(), &api.ConsumeRequest{
+		Offset: 0,
+	})
+	if consume != nil {
+		t.Fatalf("got consume: %v, want: nil", consume)
+	}
+	if grpc.Code(err) != grpc.Code(api.ErrOffsetOutOfRange) {
+		t.Fatalf("got err: %v, want: %v", err, api.ErrOffsetOutOfRange)
+	}
+    if grpc.ErrorDesc(err) != grpc.ErrorDesc(api.ErrOffsetOutOfRange) {
+		t.Fatalf("got err: %v, want: %v", err, api.ErrOffsetOutOfRange)
+	}
+}
+```
 
 check is a helper function used to DRY up our error checking.
 
@@ -232,6 +272,65 @@ func (m mocklog) ReadBatch(off uint64) (*api.RecordBatch, error) {
 	return m[off], nil
 }
 ```
+
+## Stream messages
+
+Communication between applications built on logs is rarely one and done, instead these applications
+communicate by streaming messages with one another. Data pipeline creators jumped on board with streams sooner than others because their pipelines fit the model and to reap the performance gains. Now developers building user facing applications are taking advantage of streams to build features like streaming, real-time messages such as in Twitch or Twitter. We'll now add streaming capability to our service.
+
+Back to our protobuf file, we're going to add two methods:
+
+1. ConsumeStream - a server streaming RPC to allow the client to make a single consume request and the server will stream back the corresponding message, along with all subsequent messages. If you were writing a service that reads from the log and stores the messages in a database, you'd use this type of API.
+2. ProduceStream - a bidirectional streaming RPC to allow the client to stream produce requests and responses, appending messages to the log while optionally using the response to check errors, progress, or some other notification. If you were writing a service that ingested messages into your system then it would use this type of API.
+
+Your service will look like the following. You prepend "stream" before your request or response or both to indicate it will stream. Run `$ make clean build` to compile it code and have a look at log.go.pb to see what the compiler generated and the API you'll be using.
+
+```
+service Log {
+  rpc Produce (ProduceRequest) returns (ProduceResponse) {}
+  rpc Consume (ConsumeRequest) returns (ConsumeResponse) {}
+  rpc ConsumeStream(ConsumeRequest) returns (stream ConsumeResponse) {}
+  rpc ProduceStream(stream ProduceRequest) returns (stream ProduceResponse) {}
+}
+```
+
+Implementing these APIs in our servers is easy as gRPC's are easy to use and we can build on our existing methods. In server.go we add the following methods. Streaming APIs are passed a similar stream interface with two core methods: Send() - to send messages to the stream and Recv() - to receive messages from the stream. Additionally you can use Context() method to check whether the RPC was timed out, terminated, or canceled. For example if your service was Twitch-like and streamed messages to users, when a user turned off chat you'd want to cancel the stream and prevent wasting bandwidth.
+
+Our streaming methods are basically just our existing unary methods wrapped with for loops. ConsumeStream tracks the offset of the next message to send to the client which will be sent the next time the client calls Recv(). ProduceStream is simpler - receiving a batch from the stream, appending it to the log, and sending back a response.
+
+``` go
+func (s *grpcServer) ConsumeStream(req *api.ConsumeRequest, stream api.Log_ConsumeStreamServer) error {
+	for {
+		res, err := s.Consume(stream.Context(), req)
+		if err != nil {
+			return err
+		}
+		if err = stream.Send(res); err != nil {
+			return err
+		}
+		req.Offset++
+	}
+}
+
+func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		res, err := s.Produce(stream.Context(), req)
+		if err != nil {
+			return err
+		}
+		if err = stream.Send(res); err != nil {
+			return err
+		}
+	}
+}
+```
+
+We'll add tests for our stream methods and see how streaming works from the client-side.
+
 
 ## What you learned
 

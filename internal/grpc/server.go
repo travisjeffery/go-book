@@ -43,16 +43,31 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api
 }
 
 func (s *grpcServer) ConsumeStream(req *api.ConsumeRequest, stream api.Log_ConsumeStreamServer) error {
-	offset := req.Offset
 	for {
-		batch, err := s.log.ReadBatch(offset)
+		res, err := s.Consume(stream.Context(), req)
 		if err != nil {
 			return err
 		}
-		if err = stream.Send(&api.ConsumeResponse{RecordBatch: batch}); err != nil {
+		if err = stream.Send(res); err != nil {
 			return err
 		}
-		offset++
+		req.Offset++
+	}
+}
+
+func (s *grpcServer) ProduceStream(stream api.Log_ProduceStreamServer) error {
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		res, err := s.Produce(stream.Context(), req)
+		if err != nil {
+			return err
+		}
+		if err = stream.Send(res); err != nil {
+			return err
+		}
 	}
 }
 

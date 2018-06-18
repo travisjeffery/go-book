@@ -17,7 +17,7 @@ func TestServer(t *testing.T) {
 		"consume empty log fails":                             testConsumeEmpty,
 		"consume past log boundary fails":                     testConsumePastBoundary,
 		"produce/consume a message to/from the log succeeeds": testProduceConsume,
-		"consume stream succeeds":                             testConsumeStream,
+		"produce/consume stream succeeds":                     testProduceConsumeStream,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -59,30 +59,6 @@ func testConsumeEmpty(t *testing.T, srv *grpc.Server, client api.LogClient) {
 	}
 }
 
-func testProduceConsume(t *testing.T, srv *grpc.Server, client api.LogClient) {
-	ctx := context.Background()
-
-	want := &api.RecordBatch{
-		Records: []*api.Record{{
-			Value: []byte("hello world"),
-		}},
-	}
-
-	produce, err := client.Produce(context.Background(), &api.ProduceRequest{
-		RecordBatch: want,
-	})
-	check(t, err)
-
-	consume, err := client.Consume(ctx, &api.ConsumeRequest{
-		Offset: produce.FirstOffset,
-	})
-	check(t, err)
-
-	if !reflect.DeepEqual(want, consume.RecordBatch) {
-		t.Fatalf("API.Produce/Consume, got: %v, want %v", consume.RecordBatch, want)
-	}
-}
-
 func testConsumePastBoundary(t *testing.T, srv *grpc.Server, client api.LogClient) {
 	ctx := context.Background()
 
@@ -106,7 +82,28 @@ func testConsumePastBoundary(t *testing.T, srv *grpc.Server, client api.LogClien
 	}
 }
 
-func testConsumeStream(t *testing.T, srv *grpc.Server, client api.LogClient) {
+func testProduceConsume(t *testing.T, srv *grpc.Server, client api.LogClient) {
+	ctx := context.Background()
+
+	want := &api.RecordBatch{
+		Records: []*api.Record{{
+			Value: []byte("hello world"),
+		}},
+	}
+
+	produce, err := client.Produce(context.Background(), &api.ProduceRequest{
+		RecordBatch: want,
+	})
+	check(t, err)
+
+	consume, err := client.Consume(ctx, &api.ConsumeRequest{
+		Offset: produce.FirstOffset,
+	})
+	check(t, err)
+	equal(t, consume.RecordBatch, want)
+}
+
+func testProduceConsumeStream(t *testing.T, srv *grpc.Server, client api.LogClient) {
 	ctx := context.Background()
 
 	batches := []*api.RecordBatch{{
@@ -119,45 +116,28 @@ func testConsumeStream(t *testing.T, srv *grpc.Server, client api.LogClient) {
 		}},
 	}}
 
-	produce, err := client.Produce(ctx, &api.ProduceRequest{
-		RecordBatch: batches[0],
-	})
-	check(t, err)
+	{
+		stream, err := client.ProduceStream(ctx)
+		check(t, err)
 
-	_, err = client.Produce(ctx, &api.ProduceRequest{
-		RecordBatch: batches[1],
-	})
-	check(t, err)
+		for _, batch := range batches {
+			err = stream.Send(&api.ProduceRequest{
+				RecordBatch: batch,
+			})
+			check(t, err)
+		}
 
-	stream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{
-		Offset: produce.FirstOffset,
-	})
-	check(t, err)
-
-	consume, err := stream.Recv()
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, want := consume.RecordBatch, batches[0]
-	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("got batch: %v, want: %v", got, want)
 	}
 
-	consume, err = stream.Recv()
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, want = consume.RecordBatch, batches[1]
-	if !reflect.DeepEqual(want, got) {
-		t.Fatalf("got batch: %v, want: %v", got, want)
-	}
+	{
+		stream, err := client.ConsumeStream(ctx, &api.ConsumeRequest{Offset: 0})
+		check(t, err)
 
-	consume, err = stream.Recv()
-	if consume != nil {
-		t.Fatalf("consume not nil")
-	}
-	if grpc.Code(err) != grpc.Code(api.ErrOffsetOutOfRange) {
-		t.Fatalf("got err: %v, want: %v", err, api.ErrOffsetOutOfRange)
+		for _, batch := range batches {
+			res, err := stream.Recv()
+			check(t, err)
+			equal(t, res.RecordBatch, batch)
+		}
 	}
 }
 
@@ -165,5 +145,12 @@ func check(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func equal(t *testing.T, got, want interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got: %v, want %v", got, want)
 	}
 }

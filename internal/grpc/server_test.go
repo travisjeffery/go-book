@@ -15,8 +15,8 @@ import (
 func TestServer(t *testing.T) {
 	for scenario, fn := range map[string]func(t *testing.T, srv *grpc.Server, client api.LogClient){
 		"consume empty log fails":                             testConsumeEmpty,
-		"consume past log boundary fails":                     testConsumePastBoundary,
 		"produce/consume a message to/from the log succeeeds": testProduceConsume,
+		"consume past log boundary fails":                     testConsumePastBoundary,
 		"produce/consume stream succeeds":                     testProduceConsumeStream,
 	} {
 		t.Run(scenario, func(t *testing.T) {
@@ -59,6 +59,27 @@ func testConsumeEmpty(t *testing.T, srv *grpc.Server, client api.LogClient) {
 	}
 }
 
+func testProduceConsume(t *testing.T, srv *grpc.Server, client api.LogClient) {
+	ctx := context.Background()
+
+	want := &api.RecordBatch{
+		Records: []*api.Record{{
+			Value: []byte("hello world"),
+		}},
+	}
+
+	produce, err := client.Produce(context.Background(), &api.ProduceRequest{
+		RecordBatch: want,
+	})
+	check(t, err)
+
+	consume, err := client.Consume(ctx, &api.ConsumeRequest{
+		Offset: produce.FirstOffset,
+	})
+	check(t, err)
+	equal(t, consume.RecordBatch, want)
+}
+
 func testConsumePastBoundary(t *testing.T, srv *grpc.Server, client api.LogClient) {
 	ctx := context.Background()
 
@@ -80,27 +101,6 @@ func testConsumePastBoundary(t *testing.T, srv *grpc.Server, client api.LogClien
 	if grpc.Code(err) != grpc.Code(api.ErrOffsetOutOfRange) {
 		t.Fatalf("got err: %v, want: %v", err, api.ErrOffsetOutOfRange)
 	}
-}
-
-func testProduceConsume(t *testing.T, srv *grpc.Server, client api.LogClient) {
-	ctx := context.Background()
-
-	want := &api.RecordBatch{
-		Records: []*api.Record{{
-			Value: []byte("hello world"),
-		}},
-	}
-
-	produce, err := client.Produce(context.Background(), &api.ProduceRequest{
-		RecordBatch: want,
-	})
-	check(t, err)
-
-	consume, err := client.Consume(ctx, &api.ConsumeRequest{
-		Offset: produce.FirstOffset,
-	})
-	check(t, err)
-	equal(t, consume.RecordBatch, want)
 }
 
 func testProduceConsumeStream(t *testing.T, srv *grpc.Server, client api.LogClient) {
